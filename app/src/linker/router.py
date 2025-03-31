@@ -5,9 +5,12 @@ import time
 from datetime import datetime
 import random
 import string
-from database import get_async_session
+from src.database import get_async_session
 from .models import links_table
 from .schemas import LinkCreate
+from fastapi_cache import FastAPICache
+
+from fastapi_cache.decorator import cache
 
 
 router = APIRouter(
@@ -17,6 +20,7 @@ router = APIRouter(
 
 
 @router.get("/{short_code}")
+@cache(namespace="link:{short_code}", expire=60)
 async def get_original_link(short_code: str, session: AsyncSession = Depends(get_async_session)):
     try:
         query = select(links_table.c.full_link).where(links_table.c.short_link == short_code)
@@ -38,6 +42,7 @@ async def delete_link(short_code: str, session: AsyncSession = Depends(get_async
         statement = delete(links_table).where(links_table.c.short_link == short_code)
         await session.execute(statement)
         await session.commit()
+        await FastAPICache.clear(namespace=f"link:{short_code}")
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail={
@@ -51,6 +56,7 @@ async def update_link(short_code: str, new_link:str,session: AsyncSession = Depe
         query = update(links_table).where(links_table.c.short_link == short_code).values(full_link=new_link)
         await session.execute(query)
         await session.commit()
+        await FastAPICache.clear(namespace=f"link:{short_code}")
         return {"status": "success"}
     
     except Exception as e:
@@ -99,15 +105,18 @@ async def short_alias(request: LinkCreate,session: AsyncSession = Depends(get_as
             "status": "error",
             "data": str(e),
         })
-    
+
+
+
 @router.get('/search/')
+@cache(namespace="link:{short_code}", expire=60)
 async def search_link(full_link: str, session: AsyncSession = Depends(get_async_session)):
     try:
         query = select(links_table.c.short_link).where(links_table.c.full_link == full_link)
         result = await session.execute(query)
         result = result.scalars().all()
         print(len(result))
-        if len(result) !=0 :
+        if len(result) !=0:
             return {
                 "status": "success",
                 "data": result
@@ -123,3 +132,9 @@ async def search_link(full_link: str, session: AsyncSession = Depends(get_async_
             "status": "error",
             "data": str(e),
         })
+
+@router.get('/long/')
+@cache(expire=60)
+async def get_long():
+    time.sleep(5)
+    return 'hello'
