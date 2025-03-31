@@ -153,7 +153,7 @@ services:
     container_name: fastapi_app
     command: ["gunicorn", "src.main:app", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
     ports:
-      - "9999:8000"
+      - "8000:8000" 
     depends_on:
       - db
       - redis

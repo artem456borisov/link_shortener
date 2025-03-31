@@ -10,6 +10,9 @@ from .models import links_table
 from .schemas import LinkCreate
 from fastapi_cache import FastAPICache
 
+from src.auth.users import User
+from src.auth.users import current_active_user
+
 from fastapi_cache.decorator import cache
 
 
@@ -37,7 +40,7 @@ async def get_original_link(short_code: str, session: AsyncSession = Depends(get
         })
 
 @router.delete("/{short_code}")
-async def delete_link(short_code: str, session: AsyncSession = Depends(get_async_session)):
+async def delete_link(short_code: str, session: AsyncSession = Depends(get_async_session), user: User = Depends(current_active_user)):
     try:
         statement = delete(links_table).where(links_table.c.short_link == short_code)
         await session.execute(statement)
@@ -51,7 +54,7 @@ async def delete_link(short_code: str, session: AsyncSession = Depends(get_async
         })
 
 @router.put("/{short_code}")
-async def update_link(short_code: str, new_link:str,session: AsyncSession = Depends(get_async_session)):
+async def update_link(short_code: str, new_link:str,session: AsyncSession = Depends(get_async_session), user: User = Depends(current_active_user)):
     try:
         query = update(links_table).where(links_table.c.short_link == short_code).values(full_link=new_link)
         await session.execute(query)

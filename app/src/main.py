@@ -61,5 +61,5 @@ async def authenticated_route(user: User = Depends(current_active_user)):
     return {"message": f"Hello {user.email}!"}
 
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", reload=True, host="0.0.0.0", log_level="debug") 
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", reload=True, host="0.0.0.0", log_level="debug") 
