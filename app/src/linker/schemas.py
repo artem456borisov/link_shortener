@@ -29,3 +29,10 @@ class LinkCreate(BaseModel):
         Example: "12-31-2023 14:30" -> datetime(2023, 12, 31, 14, 30)
         """
         return datetime.strptime(date_str, '%m-%d-%Y %H:%M').date()
+
+class BulkLinkCreate(LinkCreate):
+    pass  # Inherits all fields from LinkCreate
+
+class ClickTrackResponse(BaseModel):
+    url: str
+    new_click_count: int

@@ -1,132 +1,3 @@
-# version: "3.7"
-# services:
-#   db:
-#     image: postgres:16
-#     container_name: db_app
-#     command: -p 1221
-#     environment:
-#       POSTGRES_PASSWORD: 'password'
-#     expose:
-#       - 1221
-
-#   redis:
-#     image: redis:7
-#     container_name: redis_app
-#     command: --port 5370
-#     expose:
-#       - 5370
-
-#   app:
-#     build:
-#       context: .
-#     container_name: fastapi_app
-#     command: ["/fastapi_app/docker/app.sh"]
-#     ports:
-#       - 9999:8000
-#     depends_on:
-#       - db
-#       - redis
-
-#   celery:
-#     build:
-#       context: .
-#     container_name: celery_app
-#     command: ["/fastapi_app/docker/celery.sh", "celery"]
-#     depends_on:
-#       - redis
-
-#   celery_beat:
-#     build:
-#       context: .
-#     container_name: celery_beat
-#     command: ["/fastapi_app/docker/celery_beat.sh", "celery"]
-#     depends_on:
-#       - redis
-
-#   flower:
-#     build:
-#       context: .
-#     container_name: flower_app
-#     command: ["/fastapi_app/docker/celery.sh", "flower"]
-#     depends_on:
-#       - redis
-#       - celery
-#     ports:
-#       - 8888:5555
-
-
-# services:
-#   db:
-#     image: postgres:16
-#     container_name: db_app
-#     environment:
-#       POSTGRES_PASSWORD: 'password'
-#       POSTGRES_USER: 'postgres'
-#       POSTGRES_DB: 'appdb'
-#     ports:
-#       - "1221:5432"
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-
-#   redis:
-#     image: redis:7
-#     container_name: redis_app
-#     ports:
-#       - "5370:6379"
-
-#   app:
-#     build: .
-#     container_name: fastapi_app
-#     command: ["gunicorn", "tasks.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
-#     ports:
-#       - "9999:8000"
-#     depends_on:
-#       - db
-#       - redis
-#     environment:
-#       - DATABASE_URL=postgresql://postgres:password@db:5432/appdb
-#       - REDIS_URL=redis://redis:6379/0
-#     volumes:
-#       - .:/app
-
-#   celery:
-#     build: .
-#     container_name: celery_app
-#     command: ["celery", "-A", "tasks.tasks", "worker", "--loglevel=info"]
-#     depends_on:
-#       - redis
-#     environment:
-#       - REDIS_URL=redis://redis:6379/0
-#     volumes:
-#       - .:/app
-
-#   celery_beat:
-#     build: .
-#     container_name: celery_beat
-#     command: ["celery", "-A", "tasks.tasks", "beat", "--loglevel=info"]
-#     depends_on:
-#       - redis
-#     environment:
-#       - REDIS_URL=redis://redis:6379/0
-#     volumes:
-#       - .:/app
-
-#   flower:
-#     build: .
-#     container_name: flower_app
-#     command: ["celery", "-A", "tasks.tasks", "flower", "--port=5555"]
-#     depends_on:
-#       - redis
-#       - celery
-#     ports:
-#       - "8888:5555"
-#     volumes:
-#       - .:/app
-
-# volumes:
-#   postgres_data:
-
-
 services:
   db:
     image: postgres:16
@@ -158,23 +29,22 @@ services:
       - db
       - redis
     environment:
-      - PYTHONPATH=/app
-      - DATABASE_URL=postgresql://postgres:password@db:5432/appdb
+      # - PYTHONPATH=/app
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/appdb
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
 
-  celery:
+  celery_worker:
     build: .
-    container_name: celery_app
+    container_name: celery_worker
     command: ["celery", "-A", "src.tasks.tasks", "worker", "--loglevel=info"]
     depends_on:
       - redis
       - db
     environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/appdb
       - REDIS_URL=redis://redis:6379/0
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
     volumes:
       - .:/app
 
@@ -186,6 +56,7 @@ services:
       - redis
       - db
     environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/appdb
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
@@ -194,14 +65,17 @@ services:
     build: .
     container_name: flower_app
     command: ["celery", "-A", "src.tasks.tasks", "flower", "--port=5555"]
-    # command: ["ls", "src/tasks"]
     depends_on:
       - redis
-      - celery
+      - celery_beat
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
     ports:
-      - "8888:5555"
+      - "5555:5555"
     volumes:
       - .:/app
+    working_dir: /app
 
 volumes:
   postgres_data:

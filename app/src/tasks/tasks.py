@@ -11,21 +11,21 @@ from src.database import get_async_session
 from sqlalchemy import delete
 
 
-from src.config import SMTP_USER, SMTP_PASSWORD
+from src.config import SMTP_USER, SMTP_PASSWORD, REDIS_URL
 
 SMTP_HOST='smtp.gmail.com'
 SMTP_PORT=465
 
 # celery = Celery('tasks', broker='redis://localhost:6379')
 celery = Celery('tasks',
-                broker='redis://redis:6379/0',
-                backend='redis://redis:6379/0')
+                broker=REDIS_URL,
+                backend=REDIS_URL)
 
 
 celery.conf.beat_schedule = {
     'check-expired-links-hourly': {
-        'task': 'tasks.tasks.check_expired_links',
-        'schedule': crontab(minute=0, hour='*/1'), 
+        'task': 'src.tasks.tasks.check_expired_links',
+        'schedule': crontab(minute='*'), 
     },
 }
 celery.conf.timezone = 'UTC'
@@ -52,22 +52,52 @@ def send_mail(username: str):
         server.send_message(email)
 
 
+# @celery.task
+# def check_expired_links():
+#     async def _check_expired_links():
+#         current_time = datetime.datetime.now(datetime.timezone.utc)  # Use UTC
+#         async with get_async_session() as session:
+#             try:
+#                 stmt = delete(links_table).where(links_table.c.expires_at <= current_time)
+#                 result = await session.execute(stmt)
+#                 await session.commit()
+#                 return {"status": "success", "deleted_count": result.rowcount}
+#             except Exception as e:
+#                 await session.rollback()
+#                 print(f"Error deleting expired links: {e}")
+#                 return {"status": "error", "message": str(e)}
+    
+#     # Create new event loop for each task
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     try:
+#         return loop.run_until_complete(_check_expired_links())
+#     finally:
+#         loop.close()
+
+
+
+
 @celery.task
 def check_expired_links():
     async def _check_expired_links():
-        current_time = datetime.datetime.now()
         async with get_async_session() as session:
-            try:
-                stmt = delete(links_table).where(links_table.c.expires_at <= current_time)
-                await session.execute(stmt)
-                await session.commit()
-                return {"status": "success", "deleted_count": stmt.rowcount}
-            except Exception as e:
-                await session.rollback()
-                print(f"Error deleting expired links: {e}")
-                return {"status": "error", "message": str(e)}
-    return asyncio.get_event_loop().run_until_complete(_check_expired_links())
+            current_time = datetime.datetime.now(datetime.timezone.utc)
+            stmt = delete(links_table).where(links_table.c.expires_at <= current_time)
+            result = await session.execute(stmt)
+            await session.commit()
+            return {"status": "success", "deleted_count": result.rowcount}
+    
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_check_expired_links())
+    except Exception as e:
+        print(f"Error deleting expired links: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        loop.close()
 
-check_expired_links.apply_async(countdown=60*60)
+# check_expired_links.apply_async(countdown=60*60)
+# check_expired_links.apply_async(countdown=10)
 
 
